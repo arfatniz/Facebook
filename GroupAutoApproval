@@ -1,0 +1,55 @@
+from playwright.sync_api import sync_playwright
+import csv
+
+def run(playwright):
+    browser = playwright.firefox.launch(headless=False)
+    context = browser.new_context()
+
+    # Set default timeout to 20000ms (20 seconds)
+    context.set_default_timeout(5500)
+    
+    # Read group IDs from a file
+    with open('group.txt', 'r') as file:
+        group_ids = file.read().splitlines()
+    
+    data = []
+    
+    # Open multiple tabs and fetch data for each group
+    for group_id in group_ids:
+        try:
+            # Open a new tab for each group and extract their data
+            page = context.new_page()
+            page.goto(f"https://www.facebook.com/groups/{group_id}/about")
+            
+            # Close potential pop-ups
+            if page.is_visible("text=Close"):
+                page.click("text=Close")
+            
+            # Extract members and daily posts
+            members = page.inner_text("text=total members")
+            daily_posts = page.inner_text("text=new posts today")
+            
+            # Save data
+            data.append({'Group ID': group_id, 'Members': members, 'Daily Posts': daily_posts})
+        
+        except Exception as e:
+            print(f"An error occurred while processing group {group_id}: {e}")
+        
+        finally:
+            # Ensure the page is closed even if an error occurs
+            page.close()
+    
+    # Write data to a CSV file
+    with open('groups_data.csv', 'w', newline='', encoding='utf-8') as csvfile:
+        fieldnames = ['Group ID', 'Members', 'Daily Posts']
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+        
+        writer.writeheader()
+        for entry in data:
+            writer.writerow(entry)
+    
+    context.close()
+    browser.close()
+
+with sync_playwright() as playwright:
+    run(playwright)
